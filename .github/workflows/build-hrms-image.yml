@@ -1,0 +1,52 @@
+name: Build Frappe HR Image
+
+on:
+  workflow_dispatch:  # 手动触发
+  push:
+    paths:
+      - 'apps.json'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/erpnext-with-hrms
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: images/layered/Containerfile
+          push: false
+          tags: erpnext-with-hrms:v15
+          build-args: |
+            FRAPPE_BRANCH=version-15
+            FRAPPE_PATH=https://github.com/frappe/frappe
+          secrets: |
+            "apps_json=apps.json"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save image as tar
+        run: |
+          docker save erpnext-with-hrms:v15 -o erpnext-with-hrms-v15.tar
+          gzip erpnext-with-hrms-v15.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: erpnext-with-hrms-v15
+          path: erpnext-with-hrms-v15.tar.gz
+          retention-days: 90

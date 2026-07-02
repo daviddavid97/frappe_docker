@@ -34,8 +34,8 @@ jobs:
           build-args: |
             FRAPPE_BRANCH=version-15
             FRAPPE_PATH=https://github.com/frappe/frappe
-          secrets: |
-            "apps_json=apps.json"
+          secret-files: |
+              apps_json=apps.json    # 正确！把 apps.json 文件内容挂载为 secret
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

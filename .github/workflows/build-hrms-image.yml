@@ -18,29 +18,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: images/layered/Containerfile
-          push: false
-          load: true
-          tags: erpnext-with-hrms:v15
-          build-args: |
-            FRAPPE_BRANCH=version-15
-            FRAPPE_PATH=https://github.com/frappe/frappe
-          secret-files: |
-            apps_json=apps.json
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Verify image exists
+      - name: Build image (raw docker build)
+        env:
+          DOCKER_BUILDKIT: "1"
         run: |
+          echo "=== 确认 apps.json 存在 ==="
+          cat apps.json
+          echo ""
+          echo "=== 开始构建 ==="
+          docker build \
+            -f images/layered/Containerfile \
+            --secret id=apps_json,src=apps.json \
+            --build-arg FRAPPE_BRANCH=version-15 \
+            --build-arg FRAPPE_PATH=https://github.com/frappe/frappe \
+            --no-cache \
+            --progress=plain \
+            -t erpnext-with-hrms:v15 \
+            .
+
+      - name: Verify image has all 3 apps
+        run: |
+          echo "=== 镜像信息 ==="
           docker images erpnext-with-hrms:v15
-          docker run --rm erpnext-with-hrms:v15 ls /home/frappe/frappe-bench/apps/
+          echo ""
+          echo "=== apps 目录内容 ==="
+          APPS=$(docker run --rm erpnext-with-hrms:v15 ls /home/frappe/frappe-bench/apps/)
+          echo "$APPS"
+          echo ""
+          echo "$APPS" | grep -qw frappe   || { echo "错误: 缺少 frappe";   exit 1; }
+          echo "$APPS" | grep -qw erpnext  || { echo "错误: 缺少 erpnext";  exit 1; }
+          echo "$APPS" | grep -qw hrms     || { echo "错误: 缺少 hrms";     exit 1; }
+          echo "✓ 三个 app 全部存在"
 
       - name: Save image as tar
         run: |

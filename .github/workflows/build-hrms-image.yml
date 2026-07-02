@@ -1,14 +1,11 @@
 name: Build Frappe HR Image
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   push:
     paths:
       - 'apps.json'
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/erpnext-with-hrms
+      - '.github/workflows/build-hrms-image.yml'
 
 jobs:
   build:
@@ -30,19 +27,26 @@ jobs:
           context: .
           file: images/layered/Containerfile
           push: false
+          load: true
           tags: erpnext-with-hrms:v15
           build-args: |
             FRAPPE_BRANCH=version-15
             FRAPPE_PATH=https://github.com/frappe/frappe
           secret-files: |
-              apps_json=apps.json    # 正确！把 apps.json 文件内容挂载为 secret
+            apps_json=apps.json
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify image exists
+        run: |
+          docker images erpnext-with-hrms:v15
+          docker run --rm erpnext-with-hrms:v15 ls /home/frappe/frappe-bench/apps/
 
       - name: Save image as tar
         run: |
           docker save erpnext-with-hrms:v15 -o erpnext-with-hrms-v15.tar
           gzip erpnext-with-hrms-v15.tar
+          ls -lh erpnext-with-hrms-v15.tar.gz
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
